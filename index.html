@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="SCP 基金会风格的可交互终端网页：用打字输入指令操作。">
+<title>SCP // SECURE TERMINAL</title>
+<link rel="stylesheet" href="css/terminal.css">
+</head>
+<body>
+
+<div class="crt" id="crt" data-theme="green">
+  <div class="bezel">
+    <header class="titlebar">
+      <span class="lights"><i class="lamp red"></i><i class="lamp amber"></i><i class="lamp green"></i></span>
+      <span class="title">SCP-FOUNDATION // SECURE TERMINAL &mdash; node&nbsp;07</span>
+      <span class="clock" id="clock">--:--:--</span>
+    </header>
+
+    <div class="screen" id="screen">
+      <div class="output" id="output" aria-live="polite"></div>
+      <div class="inputline" id="inputline" hidden>
+        <span class="prompt" id="prompt"></span><span
+              class="before" id="before"></span><span
+              class="cursor" id="cursor"> </span><span
+              class="after" id="after"></span>
+      </div>
+    </div>
+
+    <div class="scanlines" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="flicker" aria-hidden="true"></div>
+  </div>
+
+  <p class="hint">点击屏幕任意位置聚焦 · ↑/↓ 历史指令 · Tab 补全 · Ctrl+L 清屏</p>
+</div>
+
+<!-- 真实输入框：隐藏但可聚焦，用于接收键盘/移动端输入 -->
+<input id="kbd" class="kbd" autocomplete="off" autocapitalize="off" autocorrect="off"
+       spellcheck="false" aria-label="终端指令输入">
+
+<script src="js/util.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/filesystem.js"></script>
+<script src="js/commands.js"></script>
+<script src="js/terminal.js"></script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+/* ============================================================
+   SCP // SECURE TERMINAL — CRT 终端界面样式
+   ============================================================ */
+
+/* ---------- 主题变量 ---------- */
+.crt[data-theme="green"] {
+  --bg:        #040a05;
+  --bg-soft:   #071a0d;
+  --fg:        #38ff8b;
+  --fg-dim:    #1d7a45;
+  --accent:    #b6ffd4;
+  --warn:      #ffd24a;
+  --err:       #ff5b5b;
+  --link:      #6fe9ff;
+  --glow:      0 0 4px rgba(56, 255, 139, .55);
+  --beam:      rgba(56, 255, 139, .06);
+}
+.crt[data-theme="amber"] {
+  --bg:        #0b0702;
+  --bg-soft:   #1a1105;
+  --fg:        #ffb642;
+  --fg-dim:    #8a5c17;
+  --accent:    #ffe3ac;
+  --warn:      #fff07a;
+  --err:       #ff6a3d;
+  --link:      #ffd88a;
+  --glow:      0 0 4px rgba(255, 182, 66, .55);
+  --beam:      rgba(255, 182, 66, .06);
+}
+.crt[data-theme="ice"] {
+  --bg:        #03070d;
+  --bg-soft:   #061424;
+  --fg:        #7fd3ff;
+  --fg-dim:    #2b6b93;
+  --accent:    #dcf3ff;
+  --warn:      #ffe066;
+  --err:       #ff7b9c;
+  --link:      #a9c7ff;
+  --glow:      0 0 4px rgba(127, 211, 255, .55);
+  --beam:      rgba(127, 211, 255, .06);
+}
+.crt[data-theme="mono"] {
+  --bg:        #070707;
+  --bg-soft:   #131313;
+  --fg:        #e6e6e6;
+  --fg-dim:    #777;
+  --accent:    #fff;
+  --warn:      #ddd;
+  --err:       #bdbdbd;
+  --link:      #e6e6e6;
+  --glow:      0 0 3px rgba(255, 255, 255, .35);
+  --beam:      rgba(255, 255, 255, .05);
+}
+
+/* ---------- 基础 ---------- */
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+  background: #000;
+  color: var(--fg);
+  font-family: "SFMono-Regular", "JetBrains Mono", "Fira Code", Menlo, Consolas,
+               "DejaVu Sans Mono", "Noto Sans Mono CJK SC", monospace;
+  overflow: hidden;
+}
+
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(6px, 2vmin, 28px);
+  background:
+    radial-gradient(120% 90% at 50% 0%, #0a0f0c 0%, #000 70%);
+}
+
+/* ---------- 显示器外壳 ---------- */
+.crt { width: min(1100px, 100%); }
+
+.bezel {
+  position: relative;
+  border-radius: 16px;
+  padding: 10px;
+  background: linear-gradient(#14181a, #0a0c0d 60%, #050606);
+  box-shadow:
+    0 0 0 1px #262b2d,
+    0 24px 60px rgba(0, 0, 0, .9),
+    inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+
+/* ---------- 标题栏 ---------- */
+.titlebar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px 10px;
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+  user-select: none;
+}
+.titlebar .lights { display: inline-flex; gap: 6px; }
+.lamp {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: #222; box-shadow: inset 0 0 3px #000;
+}
+.lamp.red   { background: #ff5f56; box-shadow: 0 0 8px #ff5f56; }
+.lamp.amber { background: #ffbd2e; box-shadow: 0 0 8px #ffbd2e; }
+.lamp.green { background: #27c93f; box-shadow: 0 0 8px #27c93f; }
+.titlebar .title { flex: 1; color: var(--fg-dim); }
+.titlebar .clock { font-variant-numeric: tabular-nums; }
+
+/* ---------- 屏幕 ---------- */
+.screen {
+  position: relative;
+  height: clamp(340px, 74vh, 760px);
+  padding: 16px 18px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 10px;
+  background:
+    radial-gradient(120% 120% at 50% 0%, var(--bg-soft) 0%, var(--bg) 55%, #000 100%);
+  color: var(--fg);
+  font-size: clamp(12px, 1.55vmin + 8px, 16px);
+  line-height: 1.55;
+  text-shadow: var(--glow);
+  caret-color: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: var(--fg-dim) transparent;
+  cursor: text;
+}
+.screen::-webkit-scrollbar { width: 8px; }
+.screen::-webkit-scrollbar-thumb {
+  background: var(--fg-dim); border-radius: 8px;
+}
+.screen::-webkit-scrollbar-track { background: transparent; }
+
+/* 开机自检时隐藏滚动条抖动 */
+.screen.boot { overflow: hidden; }
+
+/* ---------- 输出行 ---------- */
+.output .line {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-height: 1.55em;
+}
+.dim    { color: var(--fg-dim); }
+.accent { color: var(--accent); }
+.ok     { color: var(--fg); }
+.warn   { color: var(--warn); }
+.err    { color: var(--err); text-shadow: 0 0 6px rgba(255, 91, 91, .5); }
+.link   { color: var(--link); }
+.banner { color: var(--accent); text-shadow: 0 0 8px rgba(183, 255, 212, .5); }
+.inv    { background: var(--fg); color: var(--bg); text-shadow: none; }
+
+/* 回显的输入行 */
+.echo .e-prompt { color: var(--fg-dim); }
+.echo .e-cmd    { color: var(--accent); }
+
+/* ---------- 输入行 ---------- */
+.inputline {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.inputline[hidden] { display: none; }
+.prompt { color: var(--fg-dim); margin-right: .45em; }
+.prompt .user { color: var(--accent); }
+.prompt .host { color: var(--fg); }
+.prompt .path { color: var(--link); }
+
+.cursor {
+  background: var(--fg);
+  color: var(--bg);
+  text-shadow: none;
+  box-shadow: 0 0 8px var(--fg);
+  animation: blink 1.05s steps(1) infinite;
+}
+.cursor.space { background: transparent; color: var(--fg); box-shadow: none; }
+@keyframes blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: .12; } }
+.cursor.busy { animation: none; opacity: .35; }
+
+/* ---------- CRT 效果层 ---------- */
+.scanlines, .vignette, .flicker {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  pointer-events: none;
+}
+.scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, .035) 0px,
+    rgba(255, 255, 255, .035) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: screen;
+}
+.vignette {
+  background:
+    radial-gradient(100% 100% at 50% 50%, transparent 55%, rgba(0, 0, 0, .75) 100%),
+    linear-gradient(to bottom, var(--beam), transparent 30%, transparent 70%, var(--beam));
+  box-shadow: inset 0 0 90px rgba(0, 0, 0, .9);
+}
+.flicker {
+  background: rgba(255, 255, 255, .02);
+  animation: flicker 5.5s infinite steps(1);
+}
+@keyframes flicker {
+  0%, 91%, 100% { opacity: 0; }
+  92%   { opacity: .5; }
+  93%   { opacity: 0; }
+  95%   { opacity: .3; }
+  96%   { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flicker { animation: none; }
+  .cursor  { animation: none; }
+}
+
+/* ---------- 提示 ---------- */
+.hint {
+  margin: 10px 2px 0;
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--fg-dim);
+  text-align: center;
+  user-select: none;
+}
+
+/* ---------- 隐藏输入框 ---------- */
+.kbd {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: 2px; height: 2px;
+  padding: 0; border: 0; outline: none;
+  background: transparent;
+  color: transparent;
+  font-size: 16px;        /* 防止 iOS 聚焦时缩放 */
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  z-index: -1;
+}
+
+/* ---------- 移动端 ---------- */
+@media (max-width: 640px) {
+  body { padding: 0; }
+  .bezel { border-radius: 0; padding: 6px; }
+  .screen { height: calc(100vh - 96px); padding: 10px 12px; }
+  .titlebar { font-size: 9px; padding: 4px 6px 8px; }
+  .hint { font-size: 10px; }
+}
