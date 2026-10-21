@@ -73,7 +73,6 @@
           if (s.clearance >= 3) ctx.ok('已解锁 /secure 档案库，可读取 L3 及以上文件。');
           else ctx.dim('当前等级不足，/secure 目录拒绝访问（需要 L3）。');
           ctx.blank();
-          ctx.dim('输入 help 查看指令，logout 退出登录。');
         });
       }
     },

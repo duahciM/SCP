@@ -6,7 +6,7 @@
 
   var $ = function (id) { return document.getElementById(id); };
   var crt = $('crt'), screenEl = $('screen'), outEl = $('output');
-  var inputLine = $('inputline'), promptEl = $('prompt');
+  var entrybar = $('entrybar'), entrytag = $('entrytag'), promptEl = $('prompt');
   var beforeEl = $('before'), cursorEl = $('cursor'), afterEl = $('after');
   var kbd = $('kbd');
 
@@ -159,7 +159,11 @@
            '<span class="dim">:</span><span class="path">' + esc(path) + '</span>' +
            '<span class="dim">' + (s ? '$' : '>') + '</span>';
   }
-  function refresh() { promptEl.innerHTML = promptHtml(); }
+  function refresh() {
+    promptEl.innerHTML = promptHtml();
+    var s = Auth.current();
+    entrytag.textContent = s ? 'L' + s.clearance + ' ' + s.user.toUpperCase() : '未登录';
+  }
 
   /* ---------------- 输入行渲染 ---------------- */
   var SENSITIVE = { login: 1, signin: 1, register: 1, passwd: 1 };
@@ -196,7 +200,8 @@
 
   function setBusy(b) {
     state.busy = b;
-    inputLine.hidden = b || state.locked;
+    entrybar.hidden = state.locked;
+    entrybar.classList.toggle('dimmed', b || state.locked);
     cursorEl.classList.toggle('busy', b);
     kbd.disabled = b;
     if (!b) { render(); focusInput(); }
@@ -329,7 +334,7 @@
     },
     lock: function () {
       state.locked = true;
-      inputLine.hidden = true;
+      entrybar.hidden = true;
       return new Promise(function (resolve) {
         function again(e) {
           if (e.type === 'keydown' && (e.metaKey || e.ctrlKey || e.altKey)) return;
@@ -465,7 +470,11 @@
   });
 
   screenEl.addEventListener('pointerdown', function (e) {
-    if (window.getSelection && String(window.getSelection()) ) return;
+    if (hasSelection()) return;
+    setTimeout(focusInput, 0);
+  });
+  entrybar.addEventListener('pointerdown', function (e) {
+    if (hasSelection()) return;
     setTimeout(focusInput, 0);
   });
   document.addEventListener('pointerdown', function (e) {
@@ -517,8 +526,8 @@
   function boot() {
     outEl.innerHTML = '';
     skipBoot = false;
-    inputLine.hidden = true;
-    screenEl.classList.add('boot');
+    setBusy(true);
+    refresh();
 
     var p = Promise.resolve();
     BOOT.forEach(function (row) {
@@ -535,16 +544,10 @@
       if (s) {
         out('  检测到已有会话：<span class="accent">' + esc(s.user) +
             '</span>（' + esc(s.role) + ' · L' + s.clearance + '）', 'ok');
-        out('  输入 logout 可结束会话。', 'dim');
       } else {
-        out('  未检测到有效会话 —— 当前权限等级 L0（访客）。');
-        out('  登录后按权限等级解锁档案：');
-        out('    <span class="accent">login &lt;用户名&gt; &lt;口令&gt;</span>   例：<span class="accent">login admin admin123</span>', null);
-        out('    <span class="accent">help</span>                 查看全部指令', null);
-        out('  演示账号：<span class="dim">' + Auth.DEMO.join('   ') + '</span>', null);
+        out('  未检测到有效会话 —— 当前权限等级 L0。');
       }
       blank();
-      screenEl.classList.remove('boot');
       refresh();
       setBusy(false);
       focusInput();

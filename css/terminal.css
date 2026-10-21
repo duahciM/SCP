@@ -114,7 +114,7 @@ body {
 /* ---------- 屏幕 ---------- */
 .screen {
   position: relative;
-  height: clamp(340px, 74vh, 760px);
+  height: clamp(300px, 66vh, 700px);
   padding: 16px 18px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -158,13 +158,8 @@ body {
 .echo .e-prompt { color: var(--fg-dim); }
 .echo .e-cmd    { color: var(--accent); }
 
-/* ---------- 输入行 ---------- */
-.inputline {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-.inputline[hidden] { display: none; }
-.prompt { color: var(--fg-dim); margin-right: .45em; }
+/* ---------- 提示符 ---------- */
+.prompt { color: var(--fg-dim); margin-right: .45em; white-space: nowrap; }
 .prompt .user { color: var(--accent); }
 .prompt .host { color: var(--fg); }
 .prompt .path { color: var(--link); }
@@ -220,35 +215,68 @@ body {
   .cursor  { animation: none; }
 }
 
-/* ---------- 提示 ---------- */
-.hint {
-  margin: 10px 2px 0;
-  font-size: 11px;
-  letter-spacing: .06em;
-  color: var(--fg-dim);
-  text-align: center;
-  user-select: none;
+/* ---------- 底部输入框 ---------- */
+.entrybar {
+  display: flex;
+  align-items: center;
+  gap: .55em;
+  position: relative;
+  z-index: 2;
+  margin-top: 8px;
+  padding: 9px 12px;
+  min-height: 2.6em;
+  border: 1px solid var(--fg-dim);
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(255, 255, 255, .025), rgba(0, 0, 0, .35));
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, .55), 0 0 12px rgba(0, 0, 0, .5);
+  font-size: clamp(12px, 1.55vmin + 8px, 16px);
+  line-height: 1.55;
+  text-shadow: var(--glow);
+  cursor: text;
+}
+.entrybar[hidden] { display: none; }
+.entrybar.dimmed { opacity: .4; }
+.entrybar:focus-within { border-color: var(--fg); box-shadow: inset 0 0 24px rgba(0,0,0,.55), 0 0 14px var(--beam); }
+
+.entry {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-/* ---------- 隐藏输入框 ---------- */
+/* 覆盖在渲染文本之上的透明真实输入框 */
 .kbd {
-  position: fixed;
-  left: 50%; top: 50%;
-  width: 2px; height: 2px;
-  padding: 0; border: 0; outline: none;
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  margin: 0; padding: 0;
+  border: 0; outline: none;
   background: transparent;
   color: transparent;
+  caret-color: transparent;
+  font: inherit;
   font-size: 16px;        /* 防止 iOS 聚焦时缩放 */
   opacity: 0;
-  transform: translate(-50%, -50%);
-  z-index: -1;
+}
+.kbd::selection { background: transparent; }
+.kbd:disabled { cursor: default; }
+
+.entrytag {
+  font-size: .78em;
+  letter-spacing: .08em;
+  color: var(--fg-dim);
+  white-space: nowrap;
+  user-select: none;
 }
 
 /* ---------- 移动端 ---------- */
 @media (max-width: 640px) {
   body { padding: 0; }
   .bezel { border-radius: 0; padding: 6px; }
-  .screen { height: calc(100vh - 96px); padding: 10px 12px; }
+  .screen { height: calc(100vh - 150px); padding: 10px 12px; }
+  .entrybar { padding: 8px 10px; }
   .titlebar { font-size: 9px; padding: 4px 6px 8px; }
-  .hint { font-size: 10px; }
 }
