@@ -2,8 +2,10 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#040a05">
+<meta name="format-detection" content="telephone=no">
 <meta name="description" content="SCP 基金会风格的可交互终端网页：用打字输入指令操作。">
 <title>SCP // SECURE TERMINAL</title>
 <link rel="stylesheet" href="css/terminal.css">
@@ -29,9 +31,15 @@
             class="before" id="before"></span><span
             class="cursor" id="cursor"> </span><span
             class="after" id="after"></span><!-- 透明输入框覆盖在渲染文本之上，负责接收键盘 --><input
-            id="kbd" class="kbd" autocomplete="off" autocapitalize="off" autocorrect="off"
-            spellcheck="false" aria-label="终端指令输入"></span>
+            id="kbd" class="kbd" autocomplete="off" autocapitalize="none" autocorrect="off"
+            spellcheck="false" enterkeyhint="send" aria-label="终端指令输入"></span>
       <span class="entrytag" id="entrytag"></span>
+    </div>
+
+    <!-- 移动端快捷指令条（桌面端隐藏） -->
+    <div class="quickbar" id="quickbar" hidden>
+      <div class="qscroll" id="qcmds" role="toolbar" aria-label="快捷指令"></div>
+      <div class="qkeys" id="qkeys"></div>
     </div>
 
     <div class="scanlines" aria-hidden="true"></div>

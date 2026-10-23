@@ -65,6 +65,14 @@ html, body {
   overflow: hidden;
 }
 
+html {
+  /* 移动端：禁止横竖屏切换时自动放大字号 / 橡皮筋回弹 / 蓝色点按高亮 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
 body {
   display: flex;
   align-items: center;
@@ -151,6 +159,11 @@ body {
 .warn   { color: var(--warn); }
 .err    { color: var(--err); text-shadow: 0 0 6px rgba(255, 91, 91, .5); }
 .link   { color: var(--link); }
+.link.tappable { cursor: pointer; }
+@media (hover: none) {
+  /* 触屏上没有“悬停”，用点线下划提示文件名可以点 */
+  .link.tappable { text-decoration: underline dotted; text-underline-offset: .2em; }
+}
 .banner { color: var(--accent); text-shadow: 0 0 8px rgba(183, 255, 212, .5); }
 .inv    { background: var(--fg); color: var(--bg); text-shadow: none; }
 
@@ -272,11 +285,187 @@ body {
   user-select: none;
 }
 
-/* ---------- 移动端 ---------- */
-@media (max-width: 640px) {
-  body { padding: 0; }
-  .bezel { border-radius: 0; padding: 6px; }
-  .screen { height: calc(100vh - 150px); padding: 10px 12px; }
-  .entrybar { padding: 8px 10px; }
-  .titlebar { font-size: 9px; padding: 4px 6px 8px; }
+/* ---------- 快捷指令条（默认隐藏，触屏/窄屏显示） ---------- */
+.quickbar {
+  display: none;
+  flex: none;
+  align-items: stretch;
+  gap: 6px;
+  padding: 6px 10px;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+  background: linear-gradient(rgba(0, 0, 0, .3), rgba(0, 0, 0, .55));
+  position: relative;
+  z-index: 3;
 }
+.quickbar[hidden] { display: none; }
+.quickbar.dimmed { opacity: .45; pointer-events: none; }
+
+.qscroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 1px;
+  /* 右侧渐隐：提示还有指令可以横向滑动 */
+  -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent 100%);
+}
+.qscroll::-webkit-scrollbar { display: none; }
+.qscroll.at-end,
+.qscroll.at-end::-webkit-scrollbar {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+.qkeys { display: flex; gap: 6px; flex: none; }
+
+.qchip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--fg-dim);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .04);
+  color: var(--fg);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: var(--glow);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.qchip.qkey {
+  min-width: 36px;
+  padding: 0 6px;
+  font-size: 14px;
+  color: var(--accent);
+}
+.qchip[hidden] { display: none; }
+.qchip:active,
+.qchip.pressed,
+.qchip.on {
+  background: var(--fg);
+  color: var(--bg);
+  border-color: var(--fg);
+  text-shadow: none;
+}
+.qchip:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- 移动端 / 触屏 ---------- */
+@media (max-width: 640px), (hover: none) and (pointer: coarse) {
+  body {
+    display: block;
+    padding: 0;
+    background: #000;
+  }
+
+  /* 整块显示器铺满可视区；--vvh / --vvtop 由 JS 按 visualViewport 同步，
+     软键盘弹出时输入行不会被挡住 */
+  .crt {
+    position: fixed;
+    top: var(--vvtop, 0px);
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+    height: var(--vvh, 100dvh);
+  }
+
+  .bezel {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: 0;
+    background: #000;
+    box-shadow: none;
+  }
+
+  .titlebar {
+    flex: none;
+    gap: 8px;
+    padding: calc(6px + env(safe-area-inset-top))
+             calc(12px + env(safe-area-inset-right)) 6px
+             calc(12px + env(safe-area-inset-left));
+    font-size: 10px;
+    letter-spacing: .08em;
+  }
+  .titlebar .title {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .screen {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+    padding: 8px calc(12px + env(safe-area-inset-right)) 8px
+             calc(12px + env(safe-area-inset-left));
+    border-radius: 0;
+    font-size: clamp(13px, 1.2vmin + 9px, 15px);
+    line-height: 1.6;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+
+  .scanlines, .vignette, .flicker { border-radius: 0; }
+  .vignette { box-shadow: inset 0 0 50px rgba(0, 0, 0, .85); }
+
+  .entrybar {
+    flex: none;
+    margin: 0;
+    min-height: 3em;
+    padding: 10px calc(12px + env(safe-area-inset-right)) 10px
+             calc(12px + env(safe-area-inset-left));
+    border: 0;
+    border-top: 1px solid var(--fg-dim);
+    border-radius: 0;
+    font-size: clamp(14px, 1.2vmin + 10px, 16px);
+    background: linear-gradient(rgba(255, 255, 255, .03), rgba(0, 0, 0, .5));
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, .6);
+  }
+  .entrybar:focus-within { border-color: var(--fg); box-shadow: 0 -6px 18px rgba(0,0,0,.6); }
+
+  .entrytag { display: none; }   /* 空间有限：权限等级已显示在提示符里 */
+  .kbd { font-size: 16px; }      /* 低于 16px 时 iOS 聚焦会放大页面 */
+
+  .quickbar { display: flex; }
+
+  /* 窄屏提示符精简为 user:/path$ */
+  .prompt .at,
+  .prompt .host { display: none; }
+}
+
+/* 很窄的手机：字号再收一点 */
+@media (max-width: 380px) {
+  .screen { font-size: 12.5px; }
+  .entrybar { font-size: 13.5px; }
+  .qchip { padding: 0 10px; }
+  .qchip.qkey { min-width: 32px; padding: 0 4px; }
+}
+
+/* 横屏手机 / 矮窗口：竖向空间优先给输出区 */
+@media (max-height: 520px) and (hover: none) and (pointer: coarse) {
+  .titlebar { display: none; }
+  .screen { padding-top: 4px; }
+  .entrybar { min-height: 2.6em; padding-top: 6px; padding-bottom: 6px; }
+  .quickbar { padding-top: 4px; padding-bottom: 4px; }
+  .qchip { min-height: 30px; }
+}
+
