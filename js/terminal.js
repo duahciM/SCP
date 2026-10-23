@@ -25,6 +25,8 @@
     sound: false,
     busy: false,
     locked: false,
+    booted: false,
+    kbdHidden: false,   // 触屏上用户主动收起键盘后，不要再自动弹回来
     fails: 0
   };
 
@@ -33,6 +35,22 @@
   /* ---------------- 显示宽度（CJK 占 2 列） ---------------- */
   var dispWidth = global.Util.dispWidth;
   var padTo = global.Util.padTo;
+
+  /* ---------------- 触屏 / 视口 ---------------- */
+  var IS_TOUCH = false;
+  try {
+    IS_TOUCH = global.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  } catch (e) { /* 老浏览器：当作桌面处理 */ }
+
+  /** 输出区当前能排下多少个等宽字符（等宽字体近似 0.6em 一列） */
+  function columns() {
+    var cs = global.getComputedStyle ? getComputedStyle(screenEl) : null;
+    var fs = cs ? parseFloat(cs.fontSize) : 13;
+    var pad = cs ? (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0) : 24;
+    var w = Math.max(120, screenEl.clientWidth - pad);
+    return Math.max(20, Math.floor(w / ((fs || 13) * 0.6)));
+  }
+  function narrow() { return columns() < 52; }
 
   /* ---------------- 输出 ---------------- */
   function addLine() {
@@ -43,7 +61,12 @@
     while (outEl.childNodes.length > 800) outEl.removeChild(outEl.firstChild);
     return el;
   }
-  function scroll() { screenEl.scrollTop = screenEl.scrollHeight; }
+  /* 只有停在底部时才自动跟随输出：手机上往上翻阅读旧记录时不会被拽回去 */
+  var stick = true;
+  screenEl.addEventListener('scroll', function () {
+    stick = screenEl.scrollHeight - screenEl.scrollTop - screenEl.clientHeight < 56;
+  });
+  function scroll() { if (stick) screenEl.scrollTop = screenEl.scrollHeight; }
 
   function out(html, cls) {
     var el = addLine();
@@ -66,6 +89,7 @@
   }
 
   function table(head, rows, colClasses, linkCol) {
+    if (narrow()) { tableNarrow(head, rows, colClasses, linkCol); return; }
     var cols = head.length, widths = [];
     head.forEach(function (h, i) { widths[i] = dispWidth(h); });
     rows.forEach(function (r) {
@@ -84,6 +108,22 @@
     }
     out(render(head, 'banner'));
     rows.forEach(function (r) { out(render(r)); });
+  }
+
+  /* 窄屏表格：不做列对齐（对齐会被折行打乱），单元格之间用 · 平铺 */
+  function tableNarrow(head, rows, colClasses, linkCol) {
+    function line(cells, cls) {
+      var parts = [];
+      for (var i = 0; i < cells.length; i++) {
+        var c = cls || (colClasses && colClasses[i]) || null;
+        if (i === linkCol) c = 'link';
+        var text = esc(String(cells[i]));
+        parts.push(c ? '<span class="' + c + '">' + text + '</span>' : text);
+      }
+      return parts.join('<span class="dim"> · </span>');
+    }
+    out(line(head, 'banner'));
+    rows.forEach(function (r) { out(line(r)); });
   }
 
   /* 打字机效果 */
@@ -155,14 +195,152 @@
     var user = s ? s.user : 'visitor';
     var path = FS.pathOf(state.cwd);
     return '<span class="user">' + esc(user) + '</span>' +
-           '<span class="dim">@</span><span class="host">scp-node07</span>' +
-           '<span class="dim">:</span><span class="path">' + esc(path) + '</span>' +
+           '<span class="dim at">@</span><span class="host">scp-node07</span>' +
+           '<span class="dim sep">:</span><span class="path">' + esc(path) + '</span>' +
            '<span class="dim">' + (s ? '$' : '>') + '</span>';
   }
   function refresh() {
     promptEl.innerHTML = promptHtml();
     var s = Auth.current();
     entrytag.textContent = s ? 'L' + s.clearance + ' ' + s.user.toUpperCase() : '未登录';
+    updateQuickbar(s);
+  }
+
+  /* ---------------- 快捷指令条（触屏 / 窄屏可见） ---------------- */
+  var quickbar = $('quickbar'), qcmds = $('qcmds'), qkeys = $('qkeys');
+  var QC_BUILT = false, themeChip = null;
+
+  var THEME_CYCLE = ['green', 'amber', 'ice', 'mono'];
+
+  var QC = [
+    { label: 'help',   cmd: 'help' },
+    { label: 'ls',     cmd: 'ls' },
+    { label: 'ls -l',  cmd: 'ls -l' },
+    { label: 'readme', cmd: 'cat readme.txt' },
+    { label: '登录',   cmd: 'login admin admin123', guest: true },
+    { label: '登出',   cmd: 'logout', auth: true },
+    { label: 'whoami', cmd: 'whoami' },
+    { label: 'users',  cmd: 'users' },
+    { label: 'theme',  act: 'theme' },
+    { label: 'clear',  cmd: 'clear' }
+  ];
+  var QK = [
+    { label: '↑', act: 'prev', title: '上一条指令' },
+    { label: '⇥', act: 'tab',  title: '补全指令或路径' },
+    { label: '⌨', act: 'kbd',  title: '显示 / 收起键盘' },
+    { label: '↵', act: 'run',  title: '执行当前指令' }
+  ];
+
+  function buildQuickbar() {
+    if (QC_BUILT) return;
+    QC.forEach(function (c, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'qchip';
+      b.textContent = c.label;
+      b.setAttribute('data-q', String(i));
+      if (c.act === 'theme') themeChip = b;
+      qcmds.appendChild(b);
+    });
+    QK.forEach(function (k) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'qchip qkey';
+      b.textContent = k.label;
+      b.title = k.title;
+      b.setAttribute('aria-label', k.title);
+      b.setAttribute('data-k', k.act);
+      qkeys.appendChild(b);
+    });
+    quickbar.addEventListener('pointerdown', function (e) {
+      var b = e.target.closest && e.target.closest('button');
+      if (!b) return;
+      // 触屏：阻止默认行为，别把焦点从输入框抢走（否则软键盘会收起再弹起）
+      if (e.pointerType && e.pointerType !== 'mouse') e.preventDefault();
+      b.classList.add('pressed');
+      setTimeout(function () { b.classList.remove('pressed'); }, 140);
+    });
+    quickbar.addEventListener('click', onQuickClick);
+    qcmds.addEventListener('scroll', syncChipFade);
+    QC_BUILT = true;
+  }
+
+  function onQuickClick(e) {
+    var b = e.target.closest && e.target.closest('button');
+    if (!b || !quickbar.contains(b)) return;
+    if (state.busy || state.locked) return;
+    if (b.hasAttribute('data-k')) { quickKey(b.getAttribute('data-k')); return; }
+    var c = QC[+b.getAttribute('data-q')];
+    if (!c) return;
+    blip(660, 0.04);
+    if (c.act === 'theme') { quickRun('theme ' + nextTheme()); return; }
+    quickRun(c.cmd);
+  }
+
+  function nextTheme() {
+    var i = THEME_CYCLE.indexOf(state.theme);
+    return THEME_CYCLE[(i + 1) % THEME_CYCLE.length];
+  }
+
+  function quickRun(cmd) {
+    if (!cmd) return;
+    stick = true;
+    submit(cmd);          // 与手动回车走同一条路径（回显、历史、繁忙状态都一致）
+  }
+
+  function quickKey(act) {
+    blip(820, 0.03);
+    if (act === 'prev') {
+      if (!state.history.length) { print('（还没有历史指令）', 'dim'); return; }
+      focusInput(true);
+      historyPrev();
+      return;
+    }
+    if (act === 'tab') { focusInput(true); complete(); return; }
+    if (act === 'run') {
+      var v = kbd.value;
+      if (!v.trim()) return;
+      focusInput(true);
+      stick = true;
+      submit(v);
+      return;
+    }
+    if (act === 'kbd') { toggleKbd(); return; }
+  }
+
+  function toggleKbd() {
+    if (document.activeElement === kbd) {
+      state.kbdHidden = true;
+      kbd.blur();
+    } else {
+      state.kbdHidden = false;
+      focusInput(true);
+    }
+    syncKbdChip();
+  }
+
+  /* 快捷指令横向滑动时，滚到最右就把右侧渐隐去掉 */
+  function syncChipFade() {
+    var atEnd = qcmds.scrollLeft + qcmds.clientWidth >= qcmds.scrollWidth - 2;
+    qcmds.classList.toggle('at-end', atEnd);
+  }
+
+  function syncKbdChip() {
+    var b = qkeys.querySelector('[data-k="kbd"]');
+    if (b) b.classList.toggle('on', document.activeElement === kbd);
+  }
+
+  function updateQuickbar(s) {
+    buildQuickbar();
+    quickbar.hidden = !state.booted || state.locked;
+    [].forEach.call(qcmds.children, function (b) {
+      var c = QC[+b.getAttribute('data-q')];
+      if (!c) return;
+      b.hidden = (c.guest && !!s) || (c.auth && !s);
+    });
+    if (themeChip) themeChip.title = '切换荧光配色（下一套：' + nextTheme() + '）';
+    syncKbdChip();
+    syncChipFade();
   }
 
   /* ---------------- 输入行渲染 ---------------- */
@@ -199,16 +377,25 @@
   }
 
   function setBusy(b) {
+    var wasFocused = document.activeElement === kbd;
     state.busy = b;
     entrybar.hidden = state.locked;
     entrybar.classList.toggle('dimmed', b || state.locked);
+    quickbar.classList.toggle('dimmed', b || state.locked);
     cursorEl.classList.toggle('busy', b);
-    kbd.disabled = b;
-    if (!b) { render(); focusInput(); }
+    // 用 readOnly 而不是 disabled：不会夺走焦点，手机上软键盘不会一开一合
+    kbd.readOnly = b;
+    if (!b) {
+      render();
+      if (!IS_TOUCH || wasFocused) focusInput();
+    }
+    syncKbdChip();
   }
 
-  function focusInput() {
-    if (!state.locked) { try { kbd.focus({ preventScroll: true }); } catch (e) { kbd.focus(); } }
+  function focusInput(force) {
+    if (state.locked) return;
+    if (IS_TOUCH && state.kbdHidden && !force) return;   // 用户主动收起过键盘
+    try { kbd.focus({ preventScroll: true }); } catch (e) { kbd.focus(); }
   }
 
   /* ---------------- 词法分析 ---------------- */
@@ -324,6 +511,9 @@
     esc: esc,
     clear: function () { outEl.innerHTML = ''; },
     level: level,
+    narrow: narrow,
+    columns: columns,
+    touch: IS_TOUCH,
     session: function () { return Auth.current(); },
     refresh: refresh,
     setTheme: setTheme,
@@ -335,6 +525,7 @@
     lock: function () {
       state.locked = true;
       entrybar.hidden = true;
+      quickbar.hidden = true;
       return new Promise(function (resolve) {
         function again(e) {
           if (e.type === 'keydown' && (e.metaKey || e.ctrlKey || e.altKey)) return;
@@ -383,6 +574,7 @@
 
   function submit(raw) {
     var line = raw.replace(/\s+$/, '');
+    stick = true;                 // 主动执行指令时回到“跟随输出”模式
     echoLine(raw);
     if (line.trim()) {
       state.history.push(maskBuffer(line));
@@ -469,19 +661,57 @@
     }
   });
 
+  kbd.addEventListener('focus', function () { state.kbdHidden = false; syncKbdChip(); });
+  kbd.addEventListener('blur', syncKbdChip);
+
+  /* 触屏：短按才聚焦输入框；长按 / 滑动留给“选中文本”和“滚动阅读” */
+  var tapInfo = null;
+
+  function hitCmd(el) { return !!(el && el.closest && el.closest('[data-cmd]')); }
+
   screenEl.addEventListener('pointerdown', function (e) {
-    if (hasSelection()) return;
+    if (hasSelection() || hitCmd(e.target)) return;
+    if (e.pointerType && e.pointerType !== 'mouse') {
+      tapInfo = { x: e.clientX, y: e.clientY, t: Date.now() };
+      return;
+    }
+    state.kbdHidden = false;
     setTimeout(focusInput, 0);
   });
-  entrybar.addEventListener('pointerdown', function (e) {
+  screenEl.addEventListener('pointerup', function (e) {
+    if (!tapInfo) return;
+    var dx = Math.abs(e.clientX - tapInfo.x), dy = Math.abs(e.clientY - tapInfo.y);
+    var dt = Date.now() - tapInfo.t;
+    tapInfo = null;
+    if (dx > 12 || dy > 12 || dt > 500) return;
     if (hasSelection()) return;
+    state.kbdHidden = false;
     setTimeout(focusInput, 0);
   });
+  screenEl.addEventListener('pointercancel', function () { tapInfo = null; });
+
+  entrybar.addEventListener('pointerdown', function () {
+    state.kbdHidden = false;
+    setTimeout(focusInput, 0);
+  });
+
   document.addEventListener('pointerdown', function (e) {
+    if (e.pointerType && e.pointerType !== 'mouse') return;   // 触屏走上面的精确判断
     if (e.target === kbd) return;
+    if (e.target.closest && e.target.closest('.quickbar')) return;
     if (hasSelection()) return;          // 允许用户选中文本复制
     setTimeout(focusInput, 0);
   });
+
+  /* 点输出里的文件名 = cd / cat：移动端少打很多字 */
+  outEl.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('[data-cmd]');
+    if (!t || state.busy || state.locked) return;
+    if (hasSelection()) return;
+    var cmd = t.getAttribute('data-cmd');
+    if (cmd) quickRun(cmd);
+  });
+
   function hasSelection() {
     var s = window.getSelection && String(window.getSelection());
     return !!(s && s.length);
@@ -489,7 +719,7 @@
   document.addEventListener('keydown', function (e) {
     if (state.locked) return;
     if (e.key === 'Escape' || e.key === 'Enter') skipBoot = true;
-    if (document.activeElement !== kbd && !e.metaKey && !e.ctrlKey && !e.altKey) focusInput();
+    if (document.activeElement !== kbd && !e.metaKey && !e.ctrlKey && !e.altKey) focusInput(true);
   });
 
   /* ---------------- 主题 ---------------- */
@@ -497,40 +727,85 @@
     state.theme = t;
     crt.setAttribute('data-theme', t);
     try { localStorage.setItem('scp.theme', t); } catch (err) {}
+    // 手机上让浏览器地址栏配色跟着荧光色走
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta && global.getComputedStyle) {
+      var bg = getComputedStyle(crt).getPropertyValue('--bg').trim();
+      if (bg) meta.setAttribute('content', bg);
+    }
+    if (themeChip) themeChip.title = '切换荧光配色（下一套：' + nextTheme() + '）';
   }
 
   /* ---------------- 开机自检 ---------------- */
-  var BOOT = [
-    ['  ███████╗ ██████╗██████╗    ████████╗███████╗██████╗ ███╗   ███╗', 'banner', 0],
-    ['  ██╔════╝██╔════╝██╔══██╗   ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║', 'banner', 0],
-    ['  ███████╗██║     ██████╔╝█████╗██║   █████╗  ██████╔╝██╔████╔██║', 'banner', 0],
-    ['  ╚════██║██║     ██╔═══╝ ╚════╝██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║', 'banner', 0],
-    ['  ███████║╚██████╗██║           ██║   ███████╗██║  ██║██║ ╚═╝ ██║', 'banner', 0],
-    ['  ╚══════╝ ╚═════╝╚═╝           ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝', 'banner', 0],
-    ['', null, 0],
-    ['  SCP FOUNDATION — SECURE TERMINAL  v2.7.3   node-07', 'accent', 0],
-    ['  (C) 2026 SCP Foundation · 内部使用 · 禁止外传', 'dim', 0],
-    ['', null, 0],
-    ['BIOS  CHECK ...................... OK', null, 60],
-    ['MEMORY 65536K .................... OK', null, 60],
-    ['MOUNT /vault ..................... OK', null, 60],
-    ['CLEARANCE DATABASE ............... OK', null, 60],
-    ['UPLINK site-07 ................... OK', null, 60],
-    ['KEYSTROKE AUDIT LOGGER ........... ENABLED', 'warn', 60],
-    ['', null, 0],
-    ['[WARN] 本终端记录全部按键，未授权访问将被追溯。', 'warn', 90],
-    ['[WARN] 这是演示终端：请勿输入真实口令，账号数据仅存于你的浏览器。', 'warn', 90],
-    ['', null, 0]
+  /* 宽屏用完整 Banner；窄屏换成 22 列的紧凑版，避免 ASCII 艺术被折行拆碎 */
+  var BANNER_WIDE = [
+    '  ███████╗ ██████╗██████╗    ████████╗███████╗██████╗ ███╗   ███╗',
+    '  ██╔════╝██╔════╝██╔══██╗   ╚══██╔══╝██╔════╝██╔══██╗████╗ ████║',
+    '  ███████╗██║     ██████╔╝█████╗██║   █████╗  ██████╔╝██╔████╔██║',
+    '  ╚════██║██║     ██╔═══╝ ╚════╝██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║',
+    '  ███████║╚██████╗██║           ██║   ███████╗██║  ██║██║ ╚═╝ ██║',
+    '  ╚══════╝ ╚═════╝╚═╝           ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝'
   ];
+
+  var BANNER_COMPACT = [
+    '  ██████  ████  █████ ',
+    '  ██     ██    ██  ██',
+    '  ██████ ██    █████ ',
+    '      ██ ██    ██    ',
+    '  ██████  ████ ██    '
+  ];
+
+  function bootLines() {
+    var cols = columns();
+    var compact = cols < 74;
+    var rows = [];
+
+    (compact ? BANNER_COMPACT : BANNER_WIDE).forEach(function (l) {
+      rows.push([l, 'banner', 0]);
+    });
+    rows.push(['', null, 0]);
+
+    if (compact) {
+      rows.push(['  SCP FOUNDATION — SECURE TERMINAL', 'accent', 0]);
+      rows.push(['  v2.7.3 · node-07 · 仅限内部使用', 'dim', 0]);
+    } else {
+      rows.push(['  SCP FOUNDATION — SECURE TERMINAL  v2.7.3   node-07', 'accent', 0]);
+      rows.push(['  (C) 2026 SCP Foundation · 内部使用 · 禁止外传', 'dim', 0]);
+    }
+    rows.push(['', null, 0]);
+
+    var pad = compact ? 26 : 36;
+    [
+      ['BIOS CHECK', 'OK'],
+      ['MEMORY 65536K', 'OK'],
+      ['MOUNT /vault', 'OK'],
+      ['CLEARANCE DATABASE', 'OK'],
+      ['UPLINK site-07', 'OK'],
+      ['KEYSTROKE AUDIT LOGGER', 'ENABLED']
+    ].forEach(function (c) {
+      var dots = '.'.repeat(Math.max(3, pad - c[0].length));
+      rows.push(['  ' + c[0] + ' ' + dots + ' ' + c[1],
+                 c[1] === 'ENABLED' ? 'warn' : null, 60]);
+    });
+
+    rows.push(['', null, 0]);
+    rows.push(['[WARN] 本终端记录全部按键，未授权访问将被追溯。', 'warn', 90]);
+    rows.push([compact ? '[WARN] 演示终端：请勿输入真实口令。'
+                       : '[WARN] 这是演示终端：请勿输入真实口令，账号数据仅存于你的浏览器。', 'warn', 90]);
+    rows.push(['', null, 0]);
+    return rows;
+  }
 
   function boot() {
     outEl.innerHTML = '';
     skipBoot = false;
+    state.booted = false;
+    stick = true;
     setBusy(true);
     refresh();
 
     var p = Promise.resolve();
-    BOOT.forEach(function (row) {
+    bootLines().forEach(function (row) {
       p = p.then(function () {
         if (row[0] === '') { blank(); return sleep(skipBoot ? 0 : 40); }
         return type(row[0], row[1], 4).then(function () {
@@ -549,8 +824,38 @@
       }
       blank();
       refresh();
+      state.booted = true;
+      updateQuickbar(Auth.current());
       setBusy(false);
       focusInput();
+    });
+  }
+
+  /* ---------------- 视口（软键盘 / 旋转） ---------------- */
+  /* 把 visualViewport 的尺寸同步给 CSS，输入行就始终贴在软键盘上方 */
+  function syncViewport() {
+    var vv = global.visualViewport;
+    if (!vv) return;
+    var root = document.documentElement;
+    root.style.setProperty('--vvh', Math.round(vv.height) + 'px');
+    root.style.setProperty('--vvtop', Math.round(vv.offsetTop) + 'px');
+    if (stick) scroll();
+  }
+
+  function watchViewport() {
+    syncViewport();
+    if (global.visualViewport) {
+      global.visualViewport.addEventListener('resize', syncViewport);
+      global.visualViewport.addEventListener('scroll', syncViewport);
+    }
+    var timer = null;
+    global.addEventListener('resize', function () {
+      syncViewport();
+      clearTimeout(timer);
+      timer = setTimeout(function () { syncViewport(); refresh(); render(); }, 160);
+    });
+    global.addEventListener('orientationchange', function () {
+      setTimeout(function () { syncViewport(); refresh(); }, 250);
     });
   }
 
@@ -567,8 +872,10 @@
       if (t) setTheme(t);
       state.sound = localStorage.getItem('scp.sound') === '1';
     } catch (e) {}
+    if (IS_TOUCH) state.kbdHidden = true;   // 手机上别自动弹出键盘
     setInterval(tickClock, 1000);
     tickClock();
+    watchViewport();
     refresh();
     boot();
   }

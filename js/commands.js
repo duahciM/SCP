@@ -168,9 +168,11 @@
         if (!items.length) { ctx.dim('（空目录）'); return; }
 
         if (!long) {
+          // 名字做成可点：点目录 = cd，点文件 = cat（触屏上少打很多字）
           ctx.print(items.map(function (i) {
-            return i.dir ? '<span class="link">' + esc(i.name) + '</span>'
-                         : esc(i.name);
+            var cmd = (i.dir ? 'cd ' : 'cat ') + i.name;
+            return '<span class="link tappable" data-cmd="' + esc(cmd) + '">' +
+                   esc(i.name) + '</span>';
           }).join('   '), null, true);
           return;
         }
@@ -244,6 +246,18 @@
           seen[c.usage] = 1;
           return [c.usage, c.desc + (c.minLevel && c.minLevel > 1 ? '（需要 L' + c.minLevel + '）' : '')];
         }).filter(Boolean);
+        if (ctx.narrow()) {
+          // 窄屏：不做列对齐，指令一行、说明一行
+          rows.forEach(function (r) {
+            ctx.html('  <span class="accent">' + esc(r[0]) + '</span>');
+            ctx.html('    <span class="dim">' + esc(r[1]) + '</span>');
+          });
+          ctx.blank();
+          ctx.dim(ctx.touch ? '操作：点下方快捷条执行常用指令 · ↑ 取回上一条 · ⇥ 补全'
+                            : '快捷键：↑/↓ 翻历史 · Tab 补全 · Ctrl+L 清屏 · Ctrl+C 取消当前行');
+          ctx.dim('演示账号：' + Auth.DEMO.join('  '));
+          return;
+        }
         rows.forEach(function (r) {
           ctx.html('  <span class="accent">' + esc(r[0]) + '</span>' +
                    ' '.repeat(Math.max(1, 28 - dispWidth(r[0]))) +
